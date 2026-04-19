@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual Electricity Cost Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#080e1c;--card:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#e2e8f4;--text2:#8fa3c0;--text3:#4a6080;--teal:#00d4a0;--amber:#f5a623;--red:#e84040}
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;padding:24px}
+    .wrap{max-width:1100px;margin:0 auto}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+    .title{font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:var(--teal)}
+    .sub{color:var(--text2);font-size:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .inp{width:100%;padding:10px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-size:14px}
+    .label{font-size:12px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .btn{padding:10px 16px;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-family:'Syne',sans-serif}
+    .btn-main{background:var(--teal);color:#081018}
+    .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border2)}
+    .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;margin-top:14px}
+    table{width:100%;border-collapse:collapse;min-width:860px}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+    th{color:var(--text3);font-size:12px;font-weight:600;background:rgba(255,255,255,0.03);text-transform:uppercase}
+    td input{width:100%;padding:8px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:8px;color:var(--text)}
+    .mini{padding:8px 10px;background:rgba(232,64,64,0.12);color:var(--red);border:1px solid rgba(232,64,64,0.25);border-radius:8px;cursor:pointer;font-weight:700}
+    .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+    .box{background:rgba(255,255,255,0.03);border-radius:12px;padding:14px}
+    .box .k{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+    .box .v{font-size:24px;font-weight:700}
+    .teal{color:var(--teal)} .amber{color:var(--amber)}
+    .breakdown .row{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid var(--border)}
+    .breakdown .row:last-child{border-bottom:none}
+    .rk{color:var(--text2)}
+    .rv{font-weight:600;text-align:right}
+    a{color:var(--teal);text-decoration:none}
+    @media(max-width:900px){.grid,.sum{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.grid,.sum{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">Manual Electricity Cost Calculator</div>
+        <div class="sub">Enter price per kWh manually and see the bill change instantly.</div>
+      </div>
+      <a href="index.html">← Back to main site</a>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div><div class="label">Price per kWh (€)</div><input class="inp" id="tariff-price" type="number" step="0.0001"></div>
+        <div><div class="label">Standing charge (€ once)</div><input class="inp" id="tariff-standing" type="number" step="0.01"></div>
+        <div><div class="label">VAT (%)</div><input class="inp" id="tariff-vat" type="number" step="0.1"></div>
+        <div><div class="label">Other charges (€ once)</div><input class="inp" id="tariff-other" type="number" step="0.01"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-main" id="add-row">Add row</button>
+        <button class="btn btn-ghost" id="save-data">Save data</button>
+        <button class="btn btn-ghost" id="export-csv">Export CSV</button>
+        <button class="btn btn-ghost" id="clear-all">Clear all</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Appliance</th>
+              <th>Power (W)</th>
+              <th>Hours/day</th>
+              <th>Days</th>
+              <th>kWh</th>
+              <th>Energy cost</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+
+      <div class="sum">
+        <div class="box"><div class="k">Total kWh</div><div class="v teal" id="sum-kwh">0.00</div></div>
+        <div class="box"><div class="k">Energy subtotal</div><div class="v teal" id="sum-energy">€0.00</div></div>
+        <div class="box"><div class="k">VAT amount</div><div class="v" id="sum-vat">€0.00</div></div>
+        <div class="box"><div class="k">Final total</div><div class="v amber" id="sum-total">€0.00</div></div>
+      </div>
+    </div>
+
+    <div class="card breakdown" id="breakdown"></div>
+  </div>
+
+  <script>
+    const KEY='standalone_manual_calculator_v1';
+    const defaults={
+      tariff:{price:0.25,standing:0,vat:13.5,other:0},
+      rows:[
+        {appliance:'Fridge',power:150,hours:24,days:28},
+        {appliance:'TV',power:100,hours:4,days:28},
+        {appliance:'Kettle',power:2000,hours:0.15,days:28}
+      ]
+    };
+
+    function clone(v){return JSON.parse(JSON.stringify(v));}
+    function load(){try{return JSON.parse(localStorage.getItem(KEY))||clone(defaults);}catch(e){return clone(defaults);}}
+    function save(data){localStorage.setItem(KEY,JSON.stringify(data));}
+    function money(n){return '€'+Number(n||0).toFixed(2);}
+    function rowKwh(r){return (Number(r.power||0)*Number(r.hours||0)*Number(r.days||0))/1000;}
+    function rowEnergy(r,price){return rowKwh(r)*Number(price||0);}
+    function totals(data){
+      const totalKwh=data.rows.reduce((s,r)=>s+rowKwh(r),0);
+      const energySubtotal=totalKwh*Number(data.tariff.price||0);
+      const standing=Number(data.tariff.standing||0);
+      const other=Number(data.tariff.other||0);
+      const subtotal=energySubtotal+standing+other;
+      const vatAmount=subtotal*(Number(data.tariff.vat||0)/100);
+      const grandTotal=subtotal+vatAmount;
+      return {totalKwh,energySubtotal,standing,other,subtotal,vatAmount,grandTotal};
+    }
+
+    const els={
+      price:document.getElementById('tariff-price'),
+      standing:document.getElementById('tariff-standing'),
+      vat:document.getElementById('tariff-vat'),
+      other:document.getElementById('tariff-other'),
+      rows:document.getElementById('rows'),
+      sumKwh:document.getElementById('sum-kwh'),
+      sumEnergy:document.getElementById('sum-energy'),
+      sumVat:document.getElementById('sum-vat'),
+      sumTotal:document.getElementById('sum-total'),
+      breakdown:document.getElementById('breakdown')
+    };
+
+    function render(){
+      const data=load();
+      els.price.value=data.tariff.price;
+      els.standing.value=data.tariff.standing;
+      els.vat.value=data.tariff.vat;
+      els.other.value=data.tariff.other;
+
+      els.rows.innerHTML=data.rows.map((r,i)=>`<tr>
+        <td><input data-i="${i}" data-k="appliance" value="${r.appliance||''}"></td>
+        <td><input type="number" step="0.01" data-i="${i}" data-k="power" value="${r.power??0}"></td>
+        <td><input type="number" step="0.01" data-i="${i}" data-k="hours" value="${r.hours??0}"></td>
+        <td><input type="number" step="1" data-i="${i}" data-k="days" value="${r.days??0}"></td>
+        <td>${rowKwh(r).toFixed(2)}</td>
+        <td>${money(rowEnergy(r,data.tariff.price))}</td>
+        <td><button class="mini" data-del="${i}">Delete</button></td>
+      </tr>`).join('');
+
+      const t=totals(data);
+      els.sumKwh.textContent=t.totalKwh.toFixed(2);
+      els.sumEnergy.textContent=money(t.energySubtotal);
+      els.sumVat.textContent=money(t.vatAmount);
+      els.sumTotal.textContent=money(t.grandTotal);
+      els.breakdown.innerHTML=`
+        <div class="row"><span class="rk">Total kWh × price per kWh</span><span class="rv">${t.totalKwh.toFixed(2)} × €${Number(data.tariff.price||0).toFixed(4)}</span></div>
+        <div class="row"><span class="rk">Energy subtotal</span><span class="rv">${money(t.energySubtotal)}</span></div>
+        <div class="row"><span class="rk">Standing charge (once)</span><span class="rv">${money(t.standing)}</span></div>
+        <div class="row"><span class="rk">Other charges (once)</span><span class="rv">${money(t.other)}</span></div>
+        <div class="row"><span class="rk">Subtotal before VAT</span><span class="rv">${money(t.subtotal)}</span></div>
+        <div class="row"><span class="rk">VAT ${Number(data.tariff.vat||0).toFixed(1)}%</span><span class="rv">${money(t.vatAmount)}</span></div>
+        <div class="row"><span class="rk">Final bill total</span><span class="rv amber">${money(t.grandTotal)}</span></div>
+      `;
+    }
+
+    ['price','standing','vat','other'].forEach(k=>{
+      els[k].addEventListener('input',()=>{
+        const data=load();
+        data.tariff[k]=Number(els[k].value||0);
+        save(data); render();
+      });
+    });
+
+    document.getElementById('add-row').addEventListener('click',()=>{
+      const data=load();
+      data.rows.push({appliance:'New item',power:0,hours:0,days:28});
+      save(data); render();
+    });
+
+    document.getElementById('save-data').addEventListener('click',()=>{save(load()); render();});
+    document.getElementById('clear-all').addEventListener('click',()=>{localStorage.removeItem(KEY); render();});
+
+    document.getElementById('export-csv').addEventListener('click',()=>{
+      const data=load();
+      const t=totals(data);
+      const rows=[['Appliance','Power (W)','Hours/day','Days','kWh','Energy cost']];
+      data.rows.forEach(r=>rows.push([r.appliance,r.power,r.hours,r.days,rowKwh(r).toFixed(2),rowEnergy(r,data.tariff.price).toFixed(2)]));
+      rows.push([]);
+      rows.push(['Total kWh',t.totalKwh.toFixed(2)]);
+      rows.push(['Price per kWh',Number(data.tariff.price||0).toFixed(4)]);
+      rows.push(['Energy subtotal',t.energySubtotal.toFixed(2)]);
+      rows.push(['Standing charge',t.standing.toFixed(2)]);
+      rows.push(['Other charges',t.other.toFixed(2)]);
+      rows.push(['Subtotal before VAT',t.subtotal.toFixed(2)]);
+      rows.push(['VAT %',Number(data.tariff.vat||0).toFixed(1)]);
+      rows.push(['VAT amount',t.vatAmount.toFixed(2)]);
+      rows.push(['Final bill total',t.grandTotal.toFixed(2)]);
+      const csv=rows.map(r=>r.join(',')).join('\n');
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download='manual-electricity-calculator.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    els.rows.addEventListener('input',(e)=>{
+      const t=e.target; if(!t.dataset.i) return;
+      const data=load();
+      const i=Number(t.dataset.i); const k=t.dataset.k;
+      data.rows[i][k]=k==='appliance'?t.value:Number(t.value||0);
+      save(data); render();
+    });
+
+    els.rows.addEventListener('click',(e)=>{
+      const btn=e.target.closest('[data-del]'); if(!btn) return;
+      const data=load();
+      data.rows.splice(Number(btn.dataset.del),1);
+      save(data); render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
