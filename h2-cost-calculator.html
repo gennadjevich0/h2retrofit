@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H2 Cost Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#080e1c;--card:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#e2e8f4;--text2:#8fa3c0;--text3:#4a6080;--teal:#00d4a0;--amber:#f5a623;--red:#e84040;--blue:#3d8ef5}
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;padding:24px}
+    .wrap{max-width:1100px;margin:0 auto}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+    .title{font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:var(--teal)}
+    .sub{color:var(--text2);font-size:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .inp{width:100%;padding:10px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-size:14px}
+    .label{font-size:12px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+    .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+    .box{background:rgba(255,255,255,0.03);border-radius:12px;padding:14px}
+    .box .k{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+    .box .v{font-size:24px;font-weight:700}
+    .teal{color:var(--teal)} .amber{color:var(--amber)} .blue{color:var(--blue)}
+    .breakdown .row{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid var(--border)}
+    .breakdown .row:last-child{border-bottom:none}
+    .rk{color:var(--text2)}
+    .rv{font-weight:600;text-align:right}
+    a{color:var(--teal);text-decoration:none}
+    @media(max-width:900px){.grid,.sum{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.grid,.sum{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">H2 Cost Calculator</div>
+        <div class="sub">Find the current production cost of hydrogen based on electricity price and system inputs.</div>
+      </div>
+      <a href="index.html">← Back to main site</a>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div><div class="label">Electricity price (€ / kWh)</div><input class="inp" id="electricity-price" type="number" step="0.0001" value="0.10"></div>
+        <div><div class="label">Electricity needed (kWh / kg H₂)</div><input class="inp" id="kwh-per-kg" type="number" step="0.1" value="52"></div>
+        <div><div class="label">Water cost (€ / kg H₂)</div><input class="inp" id="water-cost" type="number" step="0.01" value="0.05"></div>
+        <div><div class="label">O&amp;M cost (€ / kg H₂)</div><input class="inp" id="om-cost" type="number" step="0.01" value="0.30"></div>
+        <div><div class="label">Compression / storage (€ / kg H₂)</div><input class="inp" id="storage-cost" type="number" step="0.01" value="0.80"></div>
+        <div><div class="label">Transport / delivery (€ / kg H₂)</div><input class="inp" id="transport-cost" type="number" step="0.01" value="0.00"></div>
+      </div>
+
+      <div class="sum">
+        <div class="box"><div class="k">Electricity part</div><div class="v teal" id="electricity-part">€0.00</div></div>
+        <div class="box"><div class="k">Cost per kg H₂</div><div class="v amber" id="cost-per-kg">€0.00</div></div>
+        <div class="box"><div class="k">Cost per kWh H₂</div><div class="v blue" id="cost-per-kwh">€0.00</div></div>
+        <div class="box"><div class="k">Cost for 100 kg</div><div class="v" id="cost-100kg">€0.00</div></div>
+      </div>
+    </div>
+
+    <div class="card breakdown" id="breakdown"></div>
+  </div>
+
+  <script>
+    function euro(n){return '€'+Number(n||0).toFixed(2);}
+    function calc(){
+      const electricityPrice=Number(document.getElementById('electricity-price').value||0);
+      const kwhPerKg=Number(document.getElementById('kwh-per-kg').value||0);
+      const water=Number(document.getElementById('water-cost').value||0);
+      const om=Number(document.getElementById('om-cost').value||0);
+      const storage=Number(document.getElementById('storage-cost').value||0);
+      const transport=Number(document.getElementById('transport-cost').value||0);
+
+      const electricityPart=electricityPrice*kwhPerKg;
+      const costPerKg=electricityPart+water+om+storage+transport;
+      const costPerKwh=costPerKg/33.33;
+      const cost100kg=costPerKg*100;
+
+      document.getElementById('electricity-part').textContent=euro(electricityPart);
+      document.getElementById('cost-per-kg').textContent=euro(costPerKg);
+      document.getElementById('cost-per-kwh').textContent=euro(costPerKwh);
+      document.getElementById('cost-100kg').textContent=euro(cost100kg);
+
+      document.getElementById('breakdown').innerHTML=`
+        <div class="row"><span class="rk">Electricity price × kWh per kg</span><span class="rv">€${electricityPrice.toFixed(4)} × ${kwhPerKg.toFixed(1)} = ${euro(electricityPart)}</span></div>
+        <div class="row"><span class="rk">Water cost</span><span class="rv">${euro(water)}</span></div>
+        <div class="row"><span class="rk">O&amp;M cost</span><span class="rv">${euro(om)}</span></div>
+        <div class="row"><span class="rk">Compression / storage</span><span class="rv">${euro(storage)}</span></div>
+        <div class="row"><span class="rk">Transport / delivery</span><span class="rv">${euro(transport)}</span></div>
+        <div class="row"><span class="rk">Final cost per kg H₂</span><span class="rv amber">${euro(costPerKg)}</span></div>
+        <div class="row"><span class="rk">Final cost per kWh H₂ (33.33 kWh/kg)</span><span class="rv blue">${euro(costPerKwh)}</span></div>
+      `;
+    }
+
+    ['electricity-price','kwh-per-kg','water-cost','om-cost','storage-cost','transport-cost'].forEach(id=>{
+      document.getElementById(id).addEventListener('input',calc);
+    });
+
+    calc();
+  </script>
+</body>
+</html>
