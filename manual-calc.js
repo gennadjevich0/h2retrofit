@@ -1,5 +1,5 @@
 (function(){
-  const KEY='h2retrofit_manual_calc_v1';
+  const KEY='h2retrofit_manual_calc_v2';
   const defaults={
     tariff:{price:0.25,standing:0,vat:13.5,other:0},
     rows:[
@@ -12,15 +12,17 @@
   function load(){try{return JSON.parse(localStorage.getItem(KEY))||clone(defaults);}catch(e){return clone(defaults);}}
   function save(data){localStorage.setItem(KEY,JSON.stringify(data));}
   function money(n){return '€'+Number(n||0).toFixed(2);}
-  function calcRow(row,tariff){
-    const kwh=(Number(row.power||0)*Number(row.hours||0)*Number(row.days||0))/1000;
-    const energy=kwh*Number(tariff.price||0);
-    const standing=Number(tariff.standing||0);
-    const other=Number(tariff.other||0);
-    const subtotal=energy+standing+other;
-    const vat=subtotal*(Number(tariff.vat||0)/100);
-    const total=subtotal+vat;
-    return {kwh,energy,standing,other,vat,total};
+  function rowKwh(row){return (Number(row.power||0)*Number(row.hours||0)*Number(row.days||0))/1000;}
+  function rowEnergy(row,price){return rowKwh(row)*Number(price||0);}
+  function calcTotals(data){
+    const totalKwh=data.rows.reduce((s,r)=>s+rowKwh(r),0);
+    const energySubtotal=totalKwh*Number(data.tariff.price||0);
+    const standing=Number(data.tariff.standing||0);
+    const other=Number(data.tariff.other||0);
+    const subtotal=energySubtotal+standing+other;
+    const vatAmount=subtotal*(Number(data.tariff.vat||0)/100);
+    const grandTotal=subtotal+vatAmount;
+    return {totalKwh,energySubtotal,standing,other,subtotal,vatAmount,grandTotal};
   }
 
   function inject(){
@@ -35,12 +37,14 @@
       .calc-grid .inp{margin-bottom:0}
       .calc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
       .manual-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
-      .manual-table{width:100%;border-collapse:collapse;min-width:980px}
+      .manual-table{width:100%;border-collapse:collapse;min-width:860px}
       .manual-table th,.manual-table td{padding:8px;border-bottom:1px solid var(--border);font-size:12px;text-align:left}
       .manual-table th{color:var(--text3);font-weight:600;background:rgba(255,255,255,0.03)}
       .manual-table td input{width:100%;padding:7px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px}
       .manual-table td .mini-btn{padding:7px 10px;background:rgba(232,64,64,0.12);color:var(--red);border:1px solid rgba(232,64,64,0.25);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700}
       .sum-box{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+      .bill-breakdown{margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:12px;background:rgba(255,255,255,0.02)}
+      .bill-breakdown .row:last-child{border-bottom:none}
       @media(max-width:820px){.calc-grid,.sum-box{grid-template-columns:1fr 1fr}}
       @media(max-width:520px){.calc-grid,.sum-box{grid-template-columns:1fr}}
     `;
@@ -54,9 +58,9 @@
       <div class="st">Manual Energy Cost Calculator</div>
       <div class="calc-grid">
         <input class="inp" id="tariff-price" type="number" step="0.0001" placeholder="Price per kWh">
-        <input class="inp" id="tariff-standing" type="number" step="0.01" placeholder="Standing charge">
+        <input class="inp" id="tariff-standing" type="number" step="0.01" placeholder="Standing charge (once)">
         <input class="inp" id="tariff-vat" type="number" step="0.1" placeholder="VAT %">
-        <input class="inp" id="tariff-other" type="number" step="0.01" placeholder="Other charges">
+        <input class="inp" id="tariff-other" type="number" step="0.01" placeholder="Other charges (once)">
       </div>
       <div class="calc-actions">
         <button class="btn-sm" id="manual-add">Add row</button>
@@ -68,18 +72,19 @@
         <table class="manual-table">
           <thead>
             <tr>
-              <th>Appliance</th><th>Power (W)</th><th>Hours/day</th><th>Days</th><th>kWh</th><th>Energy cost</th><th>Standing</th><th>Other</th><th>VAT</th><th>Total</th><th>Action</th>
+              <th>Appliance</th><th>Power (W)</th><th>Hours/day</th><th>Days</th><th>kWh</th><th>Energy cost</th><th>Action</th>
             </tr>
           </thead>
           <tbody id="manual-body"></tbody>
         </table>
       </div>
       <div class="sum-box">
+        <div class="mcard"><div class="mlabel">Total kWh</div><div class="mval teal" id="sum-kwh">0.00</div></div>
         <div class="mcard"><div class="mlabel">Energy subtotal</div><div class="mval teal" id="sum-energy">€0.00</div></div>
         <div class="mcard"><div class="mlabel">VAT amount</div><div class="mval" id="sum-vat">€0.00</div></div>
         <div class="mcard"><div class="mlabel">Grand total</div><div class="mval amber" id="sum-total">€0.00</div></div>
-        <div class="mcard"><div class="mlabel">Saved tariff</div><div class="mval" id="sum-tariff">€0.00 / 0%</div></div>
       </div>
+      <div class="bill-breakdown" id="bill-breakdown"></div>
     `;
     calcTab.appendChild(card);
 
@@ -89,10 +94,11 @@
       vat:card.querySelector('#tariff-vat'),
       other:card.querySelector('#tariff-other'),
       body:card.querySelector('#manual-body'),
+      sumKwh:card.querySelector('#sum-kwh'),
       sumEnergy:card.querySelector('#sum-energy'),
       sumVat:card.querySelector('#sum-vat'),
       sumTotal:card.querySelector('#sum-total'),
-      sumTariff:card.querySelector('#sum-tariff'),
+      breakdown:card.querySelector('#bill-breakdown'),
       add:card.querySelector('#manual-add'),
       saveBtn:card.querySelector('#manual-save'),
       exportBtn:card.querySelector('#manual-export'),
@@ -105,28 +111,35 @@
       els.standing.value=data.tariff.standing;
       els.vat.value=data.tariff.vat;
       els.other.value=data.tariff.other;
-      let sumEnergy=0,sumVat=0,sumTotal=0;
+
       els.body.innerHTML=data.rows.map((row,i)=>{
-        const c=calcRow(row,data.tariff);
-        sumEnergy+=c.energy; sumVat+=c.vat; sumTotal+=c.total;
+        const kwh=rowKwh(row);
+        const energy=rowEnergy(row,data.tariff.price);
         return `<tr>
           <td><input data-i="${i}" data-k="appliance" value="${row.appliance||''}"></td>
           <td><input type="number" step="0.01" data-i="${i}" data-k="power" value="${row.power??0}"></td>
           <td><input type="number" step="0.01" data-i="${i}" data-k="hours" value="${row.hours??0}"></td>
           <td><input type="number" step="1" data-i="${i}" data-k="days" value="${row.days??0}"></td>
-          <td>${c.kwh.toFixed(2)}</td>
-          <td>${money(c.energy)}</td>
-          <td>${money(c.standing)}</td>
-          <td>${money(c.other)}</td>
-          <td>${money(c.vat)}</td>
-          <td>${money(c.total)}</td>
+          <td>${kwh.toFixed(2)}</td>
+          <td>${money(energy)}</td>
           <td><button class="mini-btn" data-del="${i}">Delete</button></td>
         </tr>`;
       }).join('');
-      els.sumEnergy.textContent=money(sumEnergy);
-      els.sumVat.textContent=money(sumVat);
-      els.sumTotal.textContent=money(sumTotal);
-      els.sumTariff.textContent=`€${Number(data.tariff.price||0).toFixed(4)} / ${Number(data.tariff.vat||0).toFixed(1)}%`;
+
+      const totals=calcTotals(data);
+      els.sumKwh.textContent=totals.totalKwh.toFixed(2);
+      els.sumEnergy.textContent=money(totals.energySubtotal);
+      els.sumVat.textContent=money(totals.vatAmount);
+      els.sumTotal.textContent=money(totals.grandTotal);
+      els.breakdown.innerHTML=`
+        <div class="row"><span class="rk">Total kWh × price per kWh</span><span class="rv">${totals.totalKwh.toFixed(2)} × €${Number(data.tariff.price||0).toFixed(4)}</span></div>
+        <div class="row"><span class="rk">Energy subtotal</span><span class="rv">${money(totals.energySubtotal)}</span></div>
+        <div class="row"><span class="rk">Standing charge (once)</span><span class="rv">${money(totals.standing)}</span></div>
+        <div class="row"><span class="rk">Other charges (once)</span><span class="rv">${money(totals.other)}</span></div>
+        <div class="row"><span class="rk">Subtotal before VAT</span><span class="rv">${money(totals.subtotal)}</span></div>
+        <div class="row"><span class="rk">VAT ${Number(data.tariff.vat||0).toFixed(1)}%</span><span class="rv">${money(totals.vatAmount)}</span></div>
+        <div class="row"><span class="rk">Final bill total</span><span class="rv amber">${money(totals.grandTotal)}</span></div>
+      `;
     }
 
     function bind(){
@@ -144,8 +157,19 @@
       els.clearBtn.addEventListener('click',()=>{ localStorage.removeItem(KEY); render(); });
       els.exportBtn.addEventListener('click',()=>{
         const data=load();
-        const rows=[['Appliance','Power (W)','Hours/day','Days','kWh','Energy cost','Standing','Other','VAT','Total']];
-        data.rows.forEach(r=>{ const c=calcRow(r,data.tariff); rows.push([r.appliance,r.power,r.hours,r.days,c.kwh.toFixed(2),c.energy.toFixed(2),c.standing.toFixed(2),c.other.toFixed(2),c.vat.toFixed(2),c.total.toFixed(2)]); });
+        const totals=calcTotals(data);
+        const rows=[['Appliance','Power (W)','Hours/day','Days','kWh','Energy cost']];
+        data.rows.forEach(r=>{ rows.push([r.appliance,r.power,r.hours,r.days,rowKwh(r).toFixed(2),rowEnergy(r,data.tariff.price).toFixed(2)]); });
+        rows.push([]);
+        rows.push(['Total kWh',totals.totalKwh.toFixed(2)]);
+        rows.push(['Price per kWh',Number(data.tariff.price||0).toFixed(4)]);
+        rows.push(['Energy subtotal',totals.energySubtotal.toFixed(2)]);
+        rows.push(['Standing charge',totals.standing.toFixed(2)]);
+        rows.push(['Other charges',totals.other.toFixed(2)]);
+        rows.push(['Subtotal before VAT',totals.subtotal.toFixed(2)]);
+        rows.push(['VAT %',Number(data.tariff.vat||0).toFixed(1)]);
+        rows.push(['VAT amount',totals.vatAmount.toFixed(2)]);
+        rows.push(['Final bill total',totals.grandTotal.toFixed(2)]);
         const csv=rows.map(r=>r.join(',')).join('\n');
         const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
         const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='manual-energy-calculator.csv'; a.click(); URL.revokeObjectURL(url);
